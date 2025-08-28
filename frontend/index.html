@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADB 截图工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        
+        .toolbar {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+        
+        .toolbar label {
+            font-weight: 500;
+        }
+        
+        .toolbar select, .toolbar button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .toolbar select {
+            min-width: 200px;
+            background: white;
+        }
+        
+        .toolbar button {
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .toolbar button:hover {
+            background: #2980b9;
+        }
+        
+        .toolbar button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .node-screenshot-btn {
+            background: #e67e22 !important;
+        }
+        
+        .node-screenshot-btn:hover {
+            background: #d35400 !important;
+        }
+        
+        .multipoint-toggle {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .multipoint-toggle:hover {
+            background: #c0392b;
+        }
+        
+        .multipoint-toggle.active {
+            background: #27ae60;
+        }
+        
+        .multipoint-toggle.active:hover {
+            background: #229954;
+        }
+        
+        .clear-btn {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .clear-btn:hover {
+            background: #e67e22;
+        }
+        
+        .generate-btn {
+            background: #9b59b6;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .generate-btn:hover {
+            background: #8e44ad;
+        }
+        
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .image-area {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ecf0f1;
+            overflow: auto;
+            min-height: 0;
+        }
+        
+        .magnifier {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            height: 300px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: white;
+            z-index: 1000;
+            display: none;
+            overflow: hidden;
+            transition: all 0.2s ease-in-out;
+            pointer-events: none;
+        }
+        
+        .magnifier canvas {
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+        
+        .magnifier-info {
+            position: absolute;
+            bottom: -30px;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            text-align: center;
+            font-size: 12px;
+            padding: 4px;
+            border-radius: 3px;
+        }
+        
+        .image-container {
+            position: relative;
+            display: inline-block;
+            margin: 20px;
+        }
+        
+        .screenshot-image {
+            display: block;
+            max-width: calc(100vw - 340px);
+            max-height: calc(100vh - 140px);
+            object-fit: contain;
+        }
+        
+        .selection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        
+        .selection-box {
+            position: absolute;
+            border: 2px dashed #3498db;
+            background: rgba(52, 152, 219, 0.1);
+            display: none;
+            pointer-events: none;
+        }
+        
+        .info-panel {
+            width: 320px;
+            background: #34495e;
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        
+        .info-section {
+            margin-bottom: 25px;
+        }
+        
+        .info-section h3 {
+            color: #3498db;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .info-item {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .coords-display {
+            background: #2c3e50;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-line;
+        }
+        
+
+        
+        .save-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .save-section input, .save-section select, .save-section button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .save-section input {
+            background: white;
+            color: #2c3e50;
+        }
+        
+        .save-button {
+            background: #4caf50;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .save-button:hover {
+            background: #45a049;
+        }
+        
+        .save-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+
+        
+        .download-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .download-info .tip {
+            color: #28a745;
+            font-weight: 500;
+        }
+        
+        .color-picker-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .color-picker-toggle {
+            background: #9b59b6;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .color-picker-toggle:hover {
+            background: #8e44ad;
+        }
+        
+        .color-picker-toggle.active {
+            background: #e74c3c;
+        }
+        
+        .color-picker-toggle.active:hover {
+            background: #c0392b;
+        }
+        
+        .color-slots {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+        
+        .color-slot {
+            display: flex;
+            flex-direction: column;
+            background: #2c3e50;
+            border: 1px solid #34495e;
+            border-radius: 5px;
+            padding: 8px;
+            gap: 6px;
+            min-height: 60px;
+        }
+        
+        .color-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .color-preview {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #fff;
+            border-radius: 3px;
+            background: #f8f9fa;
+            flex-shrink: 0;
+        }
+        
+        .color-value {
+            flex: 1;
+            font-family: monospace;
+            font-size: 11px;
+            color: #ecf0f1;
+        }
+        
+        .color-coords {
+            font-family: monospace;
+            font-size: 10px;
+            color: #bdc3c7;
+            margin-bottom: 4px;
+        }
+        
+        .color-buttons {
+            display: flex;
+            gap: 2px;
+            flex-wrap: wrap;
+        }
+        
+        .color-copy-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 2px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 9px;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .color-copy-btn:hover {
+            background: #2980b9;
+        }
+        
+        .color-copy-btn:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+        
+        .color-copy-btn.coord-btn {
+            background: #e67e22;
+        }
+        
+        .color-copy-btn.coord-btn:hover {
+            background: #d35400;
+        }
+        
+        .download-instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 13px;
+            color: #856404;
+        }
+        
+        .download-instructions h5 {
+            margin: 0 0 8px 0;
+            color: #856404;
+        }
+        
+        .download-instructions ul {
+            margin: 5px 0 0 20px;
+            padding: 0;
+        }
+        
+        .multipoint-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .multipoint-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .multipoint-info {
+            background: #2c3e50;
+            padding: 8px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 12px;
+            color: #ecf0f1;
+        }
+        
+        .multipoint-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #2c3e50;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        
+        .multipoint-placeholder {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 12px;
+            padding: 20px;
+        }
+        
+        .multipoint-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #34495e;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-size: 11px;
+        }
+        
+        .multipoint-color {
+            width: 16px;
+            height: 16px;
+            border: 1px solid #fff;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        
+        .multipoint-details {
+            flex: 1;
+            font-family: monospace;
+        }
+        
+        .multipoint-coords {
+            color: #bdc3c7;
+            font-size: 10px;
+        }
+        
+        .multipoint-remove {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+        
+        .multipoint-remove:hover {
+            background: #c0392b;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .placeholder {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 18px;
+            padding: 50px;
+        }
+        
+        /* 响应式布局 */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .info-panel {
+                width: 100%;
+                height: 200px;
+                order: 2;
+            }
+            
+            .image-area {
+                order: 1;
+            }
+            
+            .screenshot-image {
+                max-width: calc(100vw - 40px);
+                max-height: calc(100vh - 340px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <label>设备:</label>
+            <select id="deviceSelect">
+                <option value="">选择设备...</option>
+            </select>
+            <button onclick="refreshDevices()">刷新设备</button>
+            <button onclick="takeScreenshot()" id="screenshotBtn" disabled>ADB截图</button>
+            <button onclick="takeNodeScreenshot()" id="nodeScreenshotBtn" class="node-screenshot-btn" disabled>节点助手截图</button>
+            <button onclick="copyCoords()" id="copyBtn" disabled>复制坐标</button>
+        </div>
+        
+        <div class="main-content">
+            <div class="image-area">
+                <div class="magnifier" id="magnifier">
+                    <canvas id="magnifierCanvas" width="300" height="300"></canvas>
+                    <div class="magnifier-info" id="magnifierInfo">坐标: 0,0</div>
+                </div>
+                <div class="image-container" id="imageContainer">
+                    <div class="placeholder">请选择设备并点击截图</div>
+                </div>
+            </div>
+            
+            <div class="info-panel">
+                <div class="info-section">
+                    <h3>设备信息</h3>
+                    <div class="info-item" id="deviceInfo">未选择设备</div>
+                </div>
+                
+                <div class="info-section">
+                    <h3>坐标信息</h3>
+                    <div class="coords-display" id="coordsDisplay">未选择区域</div>
+                </div>
+                
+                <div class="info-section">
+                    <h3>多点取色</h3>
+                    <div class="multipoint-section">
+                        <div class="multipoint-controls">
+                            <button onclick="toggleMultipointMode()" id="multipointBtn" class="multipoint-toggle">
+                                🎯 多点取色模式
+                            </button>
+                            <button onclick="clearMultipoints()" id="clearBtn" class="clear-btn" disabled>清除所有点</button>
+                            <button onclick="generateCode()" id="generateBtn" class="generate-btn" disabled>生成代码</button>
+                        </div>
+                        <div class="multipoint-info">
+                            <span id="multipointCount">已添加 0 个点</span>
+                        </div>
+                        <div class="multipoint-list" id="multipointList">
+                            <div class="multipoint-placeholder">点击图片上的点添加取色点</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="info-section">
+                    <h3>取色工具</h3>
+                    <div class="color-picker-section">
+                        <button onclick="toggleColorPicker()" id="colorPickerBtn" class="color-picker-toggle">
+                            🎨 启用取色模式
+                        </button>
+                        <div class="color-slots" id="colorSlots"></div>
+                    </div>
+                </div>
+                
+
+                
+                <div class="info-section">
+                    <h3>保存设置</h3>
+                    
+                    <div class="save-section">
+                        <input type="text" id="filenameInput" placeholder="输入文件名（不含扩展名）" value="">
+                        <select id="formatSelect">
+                            <option value="png">PNG格式</option>
+                            <option value="jpg">JPG格式</option>
+                        </select>
+                        
+                        <div class="download-info">
+                            <div class="tip">预览文件名:</div>
+                            <span id="previewFilename">截图_时间戳.png</span>
+                        </div>
+                        
+                        <button onclick="saveImage()" id="saveBtn" disabled class="save-button">
+                            💾 保存并下载
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="download-instructions">
+                    <h5>💡 使用说明：</h5>
+                    <ul>
+                        <li>点击"保存并下载"按钮会直接下载截图</li>
+                        <li>文件会保存到浏览器的默认下载文件夹</li>
+                    </ul>
+                </div>
+                
+                <div id="status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
