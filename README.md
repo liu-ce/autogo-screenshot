@@ -89,6 +89,7 @@ go build -o screenshot-backend main.go
    - 点击"多点取色模式"
    - 在图片上点击多个点
    - 点击"生成代码"获取Go代码
+   - 用法参考：https://zhuanlan.zhihu.com/p/1942692592690116018
 
 6. **保存图片**
    - 设置文件名和格式
