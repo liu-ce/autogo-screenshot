@@ -497,10 +497,30 @@ function handleImageClick(e) {
     
     // 多点取色模式
     if (multipointMode) {
-        const color = getPixelColor(realX, realY);
-        if (color) {
-            addMultipoint(realX, realY, color);
+        // 取周围3x3网格的9个点
+        const gridSize = 3;
+        const halfGrid = Math.floor(gridSize / 2);
+        let addedCount = 0;
+        
+        for (let offsetY = -halfGrid; offsetY <= halfGrid; offsetY++) {
+            for (let offsetX = -halfGrid; offsetX <= halfGrid; offsetX++) {
+                const pointX = realX + offsetX;
+                const pointY = realY + offsetY;
+                
+                // 确保坐标在图片范围内
+                if (pointX >= 0 && pointX < currentImage.naturalWidth && 
+                    pointY >= 0 && pointY < currentImage.naturalHeight) {
+                    const color = getPixelColor(pointX, pointY);
+                    if (color) {
+                        addMultipoint(pointX, pointY, color);
+                        addedCount++;
+                    }
+                }
+            }
         }
+        
+        // 显示一次性成功消息
+        showStatus('已添加 ' + addedCount + ' 个取色点 (中心点: ' + realX + ',' + realY + ')', 'success');
         return;
     }
     
@@ -739,7 +759,7 @@ function toggleMultipointMode() {
         btn.classList.add('active');
         clearBtn.disabled = false;
         generateBtn.disabled = false;
-        showStatus('多点取色模式已启用，点击图片上的点添加取色点', 'info');
+        showStatus('多点取色模式已启用，点击图片会自动取周围3x3网格的9个点', 'info');
     } else {
         btn.textContent = '🎯 多点取色模式';
         btn.classList.remove('active');
@@ -790,7 +810,7 @@ function updateMultipointDisplay() {
     
     // 更新列表显示
     if (multipoints.length === 0) {
-        listElement.innerHTML = '<div class="multipoint-placeholder">点击图片上的点添加取色点</div>';
+        listElement.innerHTML = '<div class="multipoint-placeholder">点击图片上的点自动取周围3x3网格的9个点</div>';
     } else {
         let html = '';
         multipoints.forEach((point, index) => {
@@ -810,7 +830,7 @@ function updateMultipointDisplay() {
 function addMultipoint(x, y, color) {
     multipoints.push({ x, y, color });
     updateMultipointDisplay();
-    showStatus('已添加取色点 (' + x + ', ' + y + ') 颜色: ' + color, 'success');
+    // 不显示每个点的添加消息，避免消息过多
 }
 
 function removeMultipoint(index) {
