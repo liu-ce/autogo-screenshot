@@ -9,7 +9,6 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
-	"io"
 	"log"
 	"net/http"
 	"os/exec"
@@ -55,7 +54,6 @@ func main() {
 	// 启用CORS
 	http.HandleFunc("/api/devices", corsMiddleware(devicesHandler))
 	http.HandleFunc("/api/screenshot", corsMiddleware(screenshotHandler))
-	http.HandleFunc("/api/node-screenshot", corsMiddleware(nodeScreenshotHandler))
 	http.HandleFunc("/api/save", corsMiddleware(saveHandler))
 
 	// 提供静态文件服务
@@ -152,66 +150,6 @@ func screenshotHandler(w http.ResponseWriter, r *http.Request) {
 
 	sendSuccess(w, map[string]string{
 		"image": imageData,
-	})
-}
-
-func nodeScreenshotHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		sendError(w, "只支持GET请求")
-		return
-	}
-
-	// 从URL参数中获取设备ID
-	deviceID := r.URL.Query().Get("device")
-	if deviceID == "" {
-		sendError(w, "设备ID不能为空")
-		return
-	}
-
-	// 构建节点助手截图URL
-	nodeURL := fmt.Sprintf("http://localhost:8801/screen.png?device=%s", deviceID)
-
-	// 发送HTTP请求获取截图
-	resp, err := http.Get(nodeURL)
-	if err != nil {
-		sendError(w, "连接节点助手失败: "+err.Error())
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		sendError(w, fmt.Sprintf("节点助手返回错误状态: %d", resp.StatusCode))
-		return
-	}
-
-	// 读取图片数据
-	imageData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		sendError(w, "读取截图数据失败: "+err.Error())
-		return
-	}
-
-	// 解码图片
-	img, err := png.Decode(bytes.NewReader(imageData))
-	if err != nil {
-		sendError(w, "图片解码失败: "+err.Error())
-		return
-	}
-
-	tool.currentImage = img
-
-	// 编码为base64
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		sendError(w, "图片编码失败: "+err.Error())
-		return
-	}
-
-	base64Data := base64.StdEncoding.EncodeToString(buf.Bytes())
-	tool.imageData = base64Data
-
-	sendSuccess(w, map[string]string{
-		"image": base64Data,
 	})
 }
 

@@ -19,7 +19,43 @@ window.onload = function() {
     refreshDevices();
     initColorPicker();
     updateMultipointDisplay();
+    initCollapsibleSections();
 };
+
+// 收缩面板功能
+function initCollapsibleSections() {
+    // 默认收起所有面板
+    const sections = ['multipoint', 'colorpicker'];
+    sections.forEach(section => {
+        const content = document.getElementById(section + 'Content');
+        const icon = document.getElementById(section + 'Icon');
+        if (content && icon) {
+            content.classList.add('collapsed');
+            content.style.maxHeight = '0';
+            icon.classList.add('collapsed');
+            icon.textContent = '▶';
+        }
+    });
+}
+
+function toggleSection(sectionName) {
+    const content = document.getElementById(sectionName + 'Content');
+    const icon = document.getElementById(sectionName + 'Icon');
+    
+    if (content.classList.contains('collapsed')) {
+        // 展开
+        content.classList.remove('collapsed');
+        content.style.maxHeight = content.scrollHeight + 'px';
+        icon.classList.remove('collapsed');
+        icon.textContent = '▼';
+    } else {
+        // 收缩
+        content.classList.add('collapsed');
+        content.style.maxHeight = '0';
+        icon.classList.add('collapsed');
+        icon.textContent = '▶';
+    }
+}
 
 function initColorPicker() {
     magnifierCanvas = document.getElementById('magnifierCanvas');
@@ -154,16 +190,13 @@ async function refreshDevices() {
 function onDeviceSelect() {
     const select = document.getElementById('deviceSelect');
     const screenshotBtn = document.getElementById('screenshotBtn');
-    const nodeScreenshotBtn = document.getElementById('nodeScreenshotBtn');
     const deviceInfo = document.getElementById('deviceInfo');
     
     if (select.value) {
         screenshotBtn.disabled = false;
-        nodeScreenshotBtn.disabled = false;
         deviceInfo.textContent = '已选择: ' + select.options[select.selectedIndex].text;
     } else {
         screenshotBtn.disabled = true;
-        nodeScreenshotBtn.disabled = true;
         deviceInfo.textContent = '未选择设备';
     }
 }
@@ -199,33 +232,6 @@ async function takeScreenshot() {
     }
 }
 
-async function takeNodeScreenshot() {
-    const deviceId = document.getElementById('deviceSelect').value;
-    if (!deviceId) {
-        showStatus('请先选择设备', 'error');
-        return;
-    }
-    
-    showStatus('正在通过节点助手截图...', 'info');
-    
-    try {
-        // 通过我们的后端代理访问节点助手API，避免CORS问题
-        const response = await fetch(API_BASE + '/api/node-screenshot?device=' + encodeURIComponent(deviceId), {
-            method: 'GET'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            displayImage(result.data.image);
-            showStatus('节点助手截图成功', 'success');
-        } else {
-            showStatus('节点助手截图失败: ' + result.message, 'error');
-        }
-    } catch (error) {
-        showStatus('节点助手截图错误: ' + error.message, 'error');
-    }
-}
 
 function displayImage(imageData) {
     const container = document.getElementById('imageContainer');
@@ -497,30 +503,11 @@ function handleImageClick(e) {
     
     // 多点取色模式
     if (multipointMode) {
-        // 取周围3x3网格的9个点
-        const gridSize = 3;
-        const halfGrid = Math.floor(gridSize / 2);
-        let addedCount = 0;
-        
-        for (let offsetY = -halfGrid; offsetY <= halfGrid; offsetY++) {
-            for (let offsetX = -halfGrid; offsetX <= halfGrid; offsetX++) {
-                const pointX = realX + offsetX;
-                const pointY = realY + offsetY;
-                
-                // 确保坐标在图片范围内
-                if (pointX >= 0 && pointX < currentImage.naturalWidth && 
-                    pointY >= 0 && pointY < currentImage.naturalHeight) {
-                    const color = getPixelColor(pointX, pointY);
-                    if (color) {
-                        addMultipoint(pointX, pointY, color);
-                        addedCount++;
-                    }
-                }
-            }
+        const color = getPixelColor(realX, realY);
+        if (color) {
+            addMultipoint(realX, realY, color);
+            showStatus('已添加取色点 (' + realX + ', ' + realY + ') 颜色: ' + color, 'success');
         }
-        
-        // 显示一次性成功消息
-        showStatus('已添加 ' + addedCount + ' 个取色点 (中心点: ' + realX + ',' + realY + ')', 'success');
         return;
     }
     
@@ -720,7 +707,7 @@ async function saveImageData() {
     const realX2 = Math.round(Math.max(selection.x1, selection.x2) * scaleX);
     const realY2 = Math.round(Math.max(selection.y1, selection.y2) * scaleY);
     
-    if (realX2 - realX1 < 10 || realY2 - realY1 < 10) {
+    if (realX2 - realX1 < 1 || realY2 - realY1 < 1) {
         throw new Error('请先选择区域');
     }
     
@@ -759,12 +746,14 @@ function toggleMultipointMode() {
         btn.classList.add('active');
         clearBtn.disabled = false;
         generateBtn.disabled = false;
-        showStatus('多点取色模式已启用，点击图片会自动取周围3x3网格的9个点', 'info');
+        document.getElementById('generateRelativeBtn').disabled = false;
+        showStatus('多点取色模式已启用，点击图片上的点添加取色点', 'info');
     } else {
         btn.textContent = '🎯 多点取色模式';
         btn.classList.remove('active');
         clearBtn.disabled = true;
         generateBtn.disabled = true;
+        document.getElementById('generateRelativeBtn').disabled = true;
         showStatus('多点取色模式已关闭', 'info');
     }
 }
@@ -796,21 +785,86 @@ function generateCode() {
     });
 }
 
+// 全局函数，确保可以被HTML调用
+window.generateRelativeCode = function() {
+    console.log('✅ generateRelativeCode函数被调用了！');
+    console.log('✅ 当前多点数量:', multipoints.length);
+    
+    if (multipoints.length === 0) {
+        console.log('❌ 没有取色点');
+        showStatus('没有取色点，无法生成代码', 'error');
+        return;
+    }
+    
+    console.log('✅ 开始生成相对坐标代码，当前点数:', multipoints.length);
+    console.log('✅ 当前所有点:', multipoints);
+    
+    // 找到最左上角的点作为原点(0,0)
+    let minX = multipoints[0].x;
+    let minY = multipoints[0].y;
+    
+    multipoints.forEach(point => {
+        if (point.x < minX) minX = point.x;
+        if (point.y < minY) minY = point.y;
+    });
+    
+    console.log('✅ 原点坐标:', minX, minY);
+    
+    // 生成特殊格式的字符串：相似度|x,y,color;x,y,color
+    let code = '0.9|';
+    multipoints.forEach((point, index) => {
+        const relativeX = point.x - minX;
+        const relativeY = point.y - minY;
+        // 移除颜色前缀的#号
+        const color = point.color.replace('#', '');
+        if (index > 0) {
+            code += ';';
+        }
+        code += relativeX + ',' + relativeY + ',' + color;
+    });
+    
+    console.log('✅ 生成的代码:', code);
+    
+    // 尝试复制到剪贴板
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(() => {
+            console.log('✅ 剪贴板复制成功');
+            showStatus('相对坐标代码已复制到剪贴板（原点: ' + minX + ',' + minY + '）', 'success');
+        }).catch((error) => {
+            console.error('❌ 剪贴板复制失败:', error);
+            showStatus('剪贴板复制失败: ' + error.message, 'error');
+        });
+    } else {
+        console.log('⚠️ 浏览器不支持剪贴板API');
+        showStatus('浏览器不支持剪贴板，请手动复制控制台中的代码', 'info');
+    }
+}
+
 function updateMultipointDisplay() {
     const clearBtn = document.getElementById('clearBtn');
     const generateBtn = document.getElementById('generateBtn');
+    const generateRelativeBtn = document.getElementById('generateRelativeBtn');
     const countElement = document.getElementById('multipointCount');
     const listElement = document.getElementById('multipointList');
     
+    console.log('📊 更新按钮状态，当前点数:', multipoints.length);
+    console.log('📊 generateRelativeBtn元素:', generateRelativeBtn);
+    
     clearBtn.disabled = multipoints.length === 0;
     generateBtn.disabled = multipoints.length === 0;
+    if (generateRelativeBtn) {
+        generateRelativeBtn.disabled = multipoints.length === 0;
+        console.log('📊 generateRelativeBtn.disabled设置为:', generateRelativeBtn.disabled);
+    } else {
+        console.log('❌ generateRelativeBtn元素未找到！');
+    }
     
     // 更新计数
     countElement.textContent = '已添加 ' + multipoints.length + ' 个点';
     
     // 更新列表显示
     if (multipoints.length === 0) {
-        listElement.innerHTML = '<div class="multipoint-placeholder">点击图片上的点自动取周围3x3网格的9个点</div>';
+        listElement.innerHTML = '<div class="multipoint-placeholder">点击图片上的点添加取色点</div>';
     } else {
         let html = '';
         multipoints.forEach((point, index) => {
@@ -830,7 +884,6 @@ function updateMultipointDisplay() {
 function addMultipoint(x, y, color) {
     multipoints.push({ x, y, color });
     updateMultipointDisplay();
-    // 不显示每个点的添加消息，避免消息过多
 }
 
 function removeMultipoint(index) {
@@ -854,3 +907,4 @@ function showStatus(message, type) {
         }, 3000);
     }
 }
+

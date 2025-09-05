@@ -68,13 +68,37 @@
             cursor: not-allowed;
         }
         
-        .node-screenshot-btn {
-            background: #e67e22 !important;
+        
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
-        .node-screenshot-btn:hover {
-            background: #d35400 !important;
+        .collapsible-header:hover {
+            color: #5dade2;
         }
+        
+        .collapse-icon {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+        }
+        
+        .collapse-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .collapsible-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .collapsible-content.collapsed {
+            max-height: 0;
+        }
+        
         
         .multipoint-toggle {
             background: #e74c3c;
@@ -568,7 +592,6 @@
             </select>
             <button onclick="refreshDevices()">刷新设备</button>
             <button onclick="takeScreenshot()" id="screenshotBtn" disabled>ADB截图</button>
-            <button onclick="takeNodeScreenshot()" id="nodeScreenshotBtn" class="node-screenshot-btn" disabled>节点助手截图</button>
             <button onclick="copyCoords()" id="copyBtn" disabled>复制坐标</button>
         </div>
         
@@ -595,33 +618,43 @@
                 </div>
                 
                 <div class="info-section">
-                    <h3>多点取色</h3>
-                    <div class="multipoint-section">
-                        <div class="multipoint-controls">
-                            <button onclick="toggleMultipointMode()" id="multipointBtn" class="multipoint-toggle">
-                                🎯 多点取色模式
-                            </button>
-                            <button onclick="clearMultipoints()" id="clearBtn" class="clear-btn" disabled>清除所有点</button>
-                            <button onclick="generateCode()" id="generateBtn" class="generate-btn" disabled>生成代码</button>
-                        </div>
-                        <div class="multipoint-info">
-                            <span id="multipointCount">已添加 0 个点</span>
-                        </div>
-                        <div class="multipoint-list" id="multipointList">
-                            <div class="multipoint-placeholder">点击图片上的点自动取周围3x3网格的9个点</div>
+                    <h3 onclick="toggleSection('multipoint')" class="collapsible-header">
+                        <span class="collapse-icon" id="multipointIcon">▼</span> 多点取色
+                    </h3>
+                    <div class="collapsible-content" id="multipointContent">
+                        <div class="multipoint-section">
+                            <div class="multipoint-controls">
+                                <button onclick="toggleMultipointMode()" id="multipointBtn" class="multipoint-toggle">
+                                    🎯 多点取色模式
+                                </button>
+                                <button onclick="clearMultipoints()" id="clearBtn" class="clear-btn" disabled>清除所有点</button>
+                                <button onclick="generateCode()" id="generateBtn" class="generate-btn" disabled>生成代码</button>
+                                <button onclick="generateRelativeCode()" id="generateRelativeBtn" class="generate-btn" disabled>生成代码（相对坐标）</button>
+                            </div>
+                            <div class="multipoint-info">
+                                <span id="multipointCount">已添加 0 个点</span>
+                            </div>
+                            <div class="multipoint-list" id="multipointList">
+                                <div class="multipoint-placeholder">点击图片上的点添加取色点</div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="info-section">
-                    <h3>取色工具</h3>
-                    <div class="color-picker-section">
-                        <button onclick="toggleColorPicker()" id="colorPickerBtn" class="color-picker-toggle">
-                            🎨 启用取色模式
-                        </button>
-                        <div class="color-slots" id="colorSlots"></div>
+                    <h3 onclick="toggleSection('colorpicker')" class="collapsible-header">
+                        <span class="collapse-icon" id="colorpickerIcon">▼</span> 单点取色
+                    </h3>
+                    <div class="collapsible-content" id="colorpickerContent">
+                        <div class="color-picker-section">
+                            <button onclick="toggleColorPicker()" id="colorPickerBtn" class="color-picker-toggle">
+                                🎨 启用取色模式
+                            </button>
+                            <div class="color-slots" id="colorSlots"></div>
+                        </div>
                     </div>
                 </div>
+                
                 
 
                 
